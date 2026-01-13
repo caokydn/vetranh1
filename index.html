@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Vẽ tranh cho bé</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: "Comic Sans MS", sans-serif;
+  background: #fef3c7;
+  overflow: hidden;
+}
+
+#toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: #fde68a;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+button {
+  font-size: 18px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: none;
+  background: #fbbf24;
+}
+
+button.active {
+  background: #34d399;
+}
+
+#palette {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.color-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #666;
+}
+
+.color-btn.active {
+  border: 4px solid #000;
+}
+
+#viewCanvas {
+  display: block;
+  touch-action: none;
+  background: white;
+}
+</style>
+</head>
+
+<body>
+
+<div id="toolbar">
+  <button id="penBtn" class="active">🖌️</button>
+  <button id="eraserBtn">🧽</button>
+
+  <div id="palette">
+    <button class="color-btn" data-color="#000000" style="background:#000000"></button>
+    <button class="color-btn" data-color="#ffffff" style="background:#ffffff"></button>
+    <button class="color-btn" data-color="#ef4444" style="background:#ef4444"></button>
+    <button class="color-btn" data-color="#f97316" style="background:#f97316"></button>
+    <button class="color-btn" data-color="#eab308" style="background:#eab308"></button>
+    <button class="color-btn" data-color="#22c55e" style="background:#22c55e"></button>
+    <button class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></button>
+    <button class="color-btn" data-color="#06b6d4" style="background:#06b6d4"></button>
+    <button class="color-btn" data-color="#8b5cf6" style="background:#8b5cf6"></button>
+    <button class="color-btn" data-color="#ec4899" style="background:#ec4899"></button>
+    <button class="color-btn" data-color="#a855f7" style="background:#a855f7"></button>
+    <button class="color-btn" data-color="#84cc16" style="background:#84cc16"></button>
+    <button class="color-btn" data-color="#f59e0b" style="background:#f59e0b"></button>
+    <button class="color-btn" data-color="#64748b" style="background:#64748b"></button>
+    <button class="color-btn" data-color="#78350f" style="background:#78350f"></button>
+  </div>
+
+  <button id="undoBtn">↩️</button>
+  <button id="redoBtn">↪️</button>
+  <button id="clearBtn">🗑️</button>
+  <button id="saveBtn">💾 JPG</button>
+</div>
+
+<canvas id="viewCanvas"></canvas>
+
+<script>
+/* ======================
+   CANVAS SETUP
+====================== */
+const viewCanvas = document.getElementById("viewCanvas");
+const viewCtx = viewCanvas.getContext("2d");
+
+const logicCanvas = document.createElement("canvas");
+logicCanvas.width = 1200;
+logicCanvas.height = 1200;
+const logicCtx = logicCanvas.getContext("2d");
+
+logicCtx.lineCap = "round";
+logicCtx.lineJoin = "round";
+
+/* ======================
+   STATE
+====================== */
+let drawing = false;
+let lastX = 0;
+let lastY = 0;
+let mode = "pen";
+let color = "#000000";
+let lineWidth = 20;
+
+let undoHistory = [];
+let redoHistory = [];
+const MAX_HISTORY = 20;
+
+let needsRedraw = false;   // ✅ thêm dòng này
+
+
+/* ======================
+   RESIZE
+====================== */
+function resizeView() {
+  const dpr = window.devicePixelRatio || 1;
+  const toolbarHeight = document.getElementById("toolbar").offsetHeight;
+
+
+  viewCanvas.style.width = innerWidth + "px";
+  viewCanvas.style.height = (innerHeight - toolbarHeight) + "px";
+
+  viewCanvas.width = innerWidth * dpr;
+  viewCanvas.height = (innerHeight - toolbarHeight) * dpr;
+
+  viewCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  redraw();
+}
+window.addEventListener("resize", resizeView);
+
+/* ======================
+   DRAWING
+====================== */
+function getLogicPos(e) {
+  const r = viewCanvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * logicCanvas.width / r.width,
+    y: (e.clientY - r.top) * logicCanvas.height / r.height
+  };
+}
+
+function startDraw(e) {
+
+  const p = getLogicPos(e);
+  drawing = true;
+  lastX = p.x;
+  lastY = p.y;
+}
+
+function draw(e) {
+  if (!drawing) return;
+
+  const p = getLogicPos(e);
+
+  logicCtx.beginPath();
+  logicCtx.moveTo(lastX, lastY);
+  logicCtx.lineTo(p.x, p.y);
+  logicCtx.stroke();
+
+  lastX = p.x;
+  lastY = p.y;
+
+  // ✅ redraw bằng requestAnimationFrame
+  if (!needsRedraw) {
+    needsRedraw = true;
+    requestAnimationFrame(() => {
+      redraw();
+      needsRedraw = false;
+    });
+  }
+}
+
+
+function endDraw() {
+  if (!drawing) return;
+  drawing = false;
+  saveState();
+}
+
+/* ======================
+   REDRAW
+====================== */
+function redraw() {
+  viewCtx.clearRect(0, 0, viewCanvas.width, viewCanvas.height);
+  viewCtx.drawImage(
+    logicCanvas,
+    0, 0, logicCanvas.width, logicCanvas.height,
+    0, 0,
+    viewCanvas.width / devicePixelRatio,
+    viewCanvas.height / devicePixelRatio
+  );
+}
+
+/* ======================
+   HISTORY
+====================== */
+function saveState() {
+  if (undoHistory.length >= MAX_HISTORY) undoHistory.shift();
+  undoHistory.push(logicCanvas.toDataURL());
+  redoHistory = []; // vẽ mới → xóa redo
+}
+
+function undo() {
+  if (!undoHistory.length) return;
+  redoHistory.push(logicCanvas.toDataURL());
+
+  const img = new Image();
+  img.onload = () => {
+    logicCtx.clearRect(0, 0, logicCanvas.width, logicCanvas.height);
+    logicCtx.drawImage(img, 0, 0);
+    redraw();
+  };
+  img.src = undoHistory.pop();
+}
+
+function redo() {
+  if (!redoHistory.length) return;
+  undoHistory.push(logicCanvas.toDataURL());
+
+  const img = new Image();
+  img.onload = () => {
+    logicCtx.clearRect(0, 0, logicCanvas.width, logicCanvas.height);
+    logicCtx.drawImage(img, 0, 0);
+    redraw();
+  };
+  img.src = redoHistory.pop();
+}
+
+/* ======================
+   TOOLS
+====================== */
+function setPen() {
+  mode = "pen";
+  logicCtx.globalCompositeOperation = "source-over";
+  logicCtx.strokeStyle = color;
+  logicCtx.lineWidth = lineWidth;
+}
+
+function setEraser() {
+  mode = "eraser";
+  logicCtx.globalCompositeOperation = "destination-out";
+  logicCtx.lineWidth = 40;
+}
+
+/* ======================
+   SAVE JPG
+====================== */
+function saveJPG() {
+  const dpr = devicePixelRatio || 1;
+  const r = viewCanvas.getBoundingClientRect();
+
+  const temp = document.createElement("canvas");
+  temp.width = r.width * dpr;
+  temp.height = r.height * dpr;
+
+  const tctx = temp.getContext("2d");
+  tctx.scale(dpr, dpr);
+  tctx.fillStyle = "#fff";
+  tctx.fillRect(0, 0, r.width, r.height);
+  tctx.drawImage(viewCanvas, 0, 0, r.width, r.height);
+
+  const a = document.createElement("a");
+  a.download = "tranh-cua-be.jpg";
+  a.href = temp.toDataURL("image/jpeg", 0.9);
+  a.click();
+}
+
+/* ======================
+   EVENTS
+====================== */
+viewCanvas.addEventListener("mousedown", startDraw);
+viewCanvas.addEventListener("mousemove", draw);
+viewCanvas.addEventListener("mouseup", endDraw);
+viewCanvas.addEventListener("mouseleave", endDraw);
+
+
+viewCanvas.addEventListener("touchstart", function (e) {
+  e.preventDefault();
+  startDraw(e.touches[0]);
+}, { passive: false });
+
+viewCanvas.addEventListener("touchmove", function (e) {
+  e.preventDefault();
+  draw(e.touches[0]);
+}, { passive: false });
+
+viewCanvas.addEventListener("touchend", endDraw);
+
+
+/* ======================
+   UI
+====================== */
+penBtn.onclick = () => {
+  setPen();
+  penBtn.classList.add("active");
+  eraserBtn.classList.remove("active");
+};
+
+eraserBtn.onclick = () => {
+  setEraser();
+  eraserBtn.classList.add("active");
+  penBtn.classList.remove("active");
+};
+
+document.querySelectorAll(".color-btn").forEach(btn => {
+  btn.onclick = () => {
+    color = btn.dataset.color;
+    setPen();
+    document.querySelectorAll(".color-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  };
+});
+
+undoBtn.onclick = undo;
+redoBtn.onclick = redo;
+
+clearBtn.onclick = () => {
+  if (!confirm("Xóa hết tranh?")) return;
+  logicCtx.clearRect(0, 0, logicCanvas.width, logicCanvas.height);
+  undoHistory = [];
+  redoHistory = [];
+  redraw();
+};
+
+saveBtn.onclick = saveJPG;
+
+/* ======================
+   INIT
+====================== */
+setPen();
+resizeView();
+</script>
+
+</body>
+</html>
