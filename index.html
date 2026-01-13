@@ -57,11 +57,46 @@ button.active {
   touch-action: none;
   background: white;
 }
+
+/* ===== FLOAT MENU BUTTON ===== */
+#menuToggle {
+  position: fixed;
+  right: 10px;
+  top: 10px;
+  z-index: 1000;
+  font-size: 22px;
+  padding: 8px 12px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ===== DROPDOWN TOOLBAR ===== */
+#toolbar {
+  position: fixed;
+  top: 55px;
+  right: 10px;
+  left: auto;
+  width: auto;
+  max-width: calc(100vw - 20px);
+  border-radius: 12px;
+  transform-origin: top right;
+  transform: scaleY(0);
+  transition: transform 0.25s ease;
+  z-index: 999;
+}
+
+#toolbar.show {
+  transform: scaleY(1);
+}
+
+  
 </style>
 </head>
 
 <body>
-
+<button id="menuToggle">☰</button>
+  
 <div id="toolbar">
   <button id="penBtn" class="active">🖌️</button>
   <button id="eraserBtn">🧽</button>
@@ -129,18 +164,17 @@ let needsRedraw = false;   // ✅ thêm dòng này
 ====================== */
 function resizeView() {
   const dpr = window.devicePixelRatio || 1;
-  const toolbarHeight = document.getElementById("toolbar").offsetHeight;
-
 
   viewCanvas.style.width = innerWidth + "px";
-  viewCanvas.style.height = (innerHeight - toolbarHeight) + "px";
+  viewCanvas.style.height = innerHeight + "px";
 
   viewCanvas.width = innerWidth * dpr;
-  viewCanvas.height = (innerHeight - toolbarHeight) * dpr;
+  viewCanvas.height = innerHeight * dpr;
 
   viewCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   redraw();
 }
+  
 window.addEventListener("resize", resizeView);
 
 /* ======================
@@ -155,6 +189,7 @@ function getLogicPos(e) {
 }
 
 function startDraw(e) {
+closeMenu();   // ✅ tự động ẩn menu khi vẽ
 
   const p = getLogicPos(e);
   drawing = true;
@@ -301,7 +336,22 @@ viewCanvas.addEventListener("touchmove", function (e) {
 
 viewCanvas.addEventListener("touchend", endDraw);
 
+/* ======================
+   FLOAT MENU CONTROL
+====================== */
+const toolbar = document.getElementById("toolbar");
+const menuToggle = document.getElementById("menuToggle");
+let menuOpen = false;
 
+function closeMenu() {
+  menuOpen = false;
+  toolbar.classList.remove("show");
+}
+
+menuToggle.onclick = () => {
+  menuOpen = !menuOpen;
+  toolbar.classList.toggle("show", menuOpen);
+};
 /* ======================
    UI
 ====================== */
